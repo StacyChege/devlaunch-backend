@@ -16,11 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
 
-
+def ping(request):
+    return JsonResponse({"message": "pong", "status": "Backend is alive"})
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
+    path('api/auth/', include('api.urls'))
 ]
     
