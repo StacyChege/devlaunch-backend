@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
 from .serializers import RegisterSerializer, UserSerializer
+from .models import Project
 
 User = get_user_model()
 
@@ -60,3 +61,31 @@ class MeView(APIView):
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+    
+
+class ProjectStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        developer = request.user
+
+        total_projects = Project.objects.filter(developer=developer).count()
+
+        deployed_sites = Project.objects.filter(
+            developer=developer,
+            status=Project.STATUS_DEPLOYED
+        ).count()
+
+        recent_projects = Project.objects.filter(
+            developer=developer
+        ).order_by('-updated_at')[:5].values(
+            'id', 'name', 'status', 'updated_at'
+        )
+
+        return Response({
+            'total_projects': total_projects,
+            'deployed_sites': deployed_sites,
+            'active_domains': 0,
+            'total_paid': 0,
+            'recent_projects': list(recent_projects),
+        })
