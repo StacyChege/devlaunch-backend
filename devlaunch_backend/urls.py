@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from django.conf.urls.static import static
+from devlaunch_backend import settings
 
 def ping(request):
     return JsonResponse({"message": "pong", "status": "Backend is alive"})
@@ -26,4 +28,8 @@ urlpatterns = [
     path('api/', include('api.urls')),
     path('api/auth/', include('api.urls'))
 ]
+
+# Static/Media URL parsing for local asset access
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     
