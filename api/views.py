@@ -4,8 +4,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
-from .serializers import RegisterSerializer, UserSerializer
-from .models import Project
+from .serializers import RegisterSerializer, UserSerializer, ProjectSerializer, TemplateSerializer
+from .models import Project, Template
 
 User = get_user_model()
 
@@ -89,3 +89,37 @@ class ProjectStatsView(APIView):
             'total_paid': 0,
             'recent_projects': list(recent_projects),
         })
+    
+class TemplateListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        queryset = Template.objects.filter(is_active=True)
+        category = request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category=category.upper())
+        templates = queryset.order_by('name')
+        serializer = TemplateSerializer(
+            templates,
+            many=True,
+            context={'request': request}
+        )
+        return Response(serializer.data)
+
+
+class TemplateDetailView(APIView):  # 👈 Make sure this line matches exactly!
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        try:
+            template = Template.objects.get(slug=slug, is_active=True)
+        except Template.DoesNotExist:
+            return Response(
+                {'error': 'Template not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = TemplateSerializer(
+            template,
+            context={'request': request}
+        )
+        return Response(serializer.data)
