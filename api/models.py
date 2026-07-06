@@ -55,10 +55,16 @@ class Project(models.Model):
         (STATUS_DEPLOYED, 'Deployed'),
         (STATUS_FAILED, 'Failed'),
     ]
+
     developer = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='projects')
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='projects'
+    )
     
     name = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True, blank=True, max_length=300)
+    customisation_data = models.JSONField(default=dict, blank=True)
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -66,6 +72,13 @@ class Project(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.name)
+            unique_id = uuid.uuid4().hex[:6]
+            self.slug = f"{base}-{unique_id}"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
