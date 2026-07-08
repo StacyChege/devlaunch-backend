@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/', include('api.urls')),
     path('api/auth/', include('api.urls')),
     path('api/projects/', include('projects.urls')),
+    path('api/templates/', include('templates.urls')),
 ]
 
 # Static/Media URL parsing for local asset access
