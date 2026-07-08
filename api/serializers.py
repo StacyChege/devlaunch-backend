@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
-from api.models import Project, Template
+
 
 User = get_user_model()
 
@@ -33,16 +33,10 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'email', 'full_name', 'role']
 
-class ProjectSerializer(serializers.ModelSerializer):
-    template_name = serializers.CharField(
-        source='template.name',
-        read_only=True,
-        default=''
-    )
-    preview_url = serializers.SerializerMethodField()
+
 
     class Meta:
-        model = Project
+        model = User
         fields = [
             'id',
             'name',
@@ -58,29 +52,3 @@ class ProjectSerializer(serializers.ModelSerializer):
         return f"https://{obj.slug}.devlaunch.app" if obj.slug else None
 
 
-class TemplateSerializer(serializers.ModelSerializer):
-    thumbnail = serializers.SerializerMethodField()
-    category_display = serializers.CharField(source='get_category_display', read_only=True)
-
-    class Meta:
-        model = Template
-        fields = [
-            'id',
-            'name',
-            'slug',
-            'description',
-            'category',
-            'category_display',
-            'tech_stack',
-            'preview_url',
-            'thumbnail_url',
-            'is_premium',
-            'is_active',
-            'created_at',
-        ]
-
-    def get_thumbnail(self, obj):
-        request = self.context.get('request')
-        if obj.thumbnail and request:
-            return request.build_absolute_uri(obj.thumbnail.url)
-        return None
