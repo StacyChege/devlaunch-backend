@@ -75,13 +75,51 @@ class ProjectListCreateView(APIView):
 class ProjectDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk):
+    def get_object(self, pk, user):
         try:
-            project = Project.objects.get(id=pk, developer=request.user)
+            return Project.objects.get(id=pk, developer=user)
         except Project.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        project = self.get_object(pk, request.user)
+        if not project:
             return Response(
                 {'error': 'Project not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         serializer = ProjectSerializer(project)
         return Response(serializer.data)
+
+    def patch(self, request, pk):
+        project = self.get_object(pk, request.user)
+        if not project:
+            return Response(
+                {'error': 'Project not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProjectSerializer(
+            project,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def delete(self, request, pk):
+        project = self.get_object(pk, request.user)
+        if not project:
+            return Response(
+                {'error': 'Project not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        project.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

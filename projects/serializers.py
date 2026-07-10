@@ -8,6 +8,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only=True,
         default=''
     )
+    template_category = serializers.CharField(
+        source='template.category',
+        read_only=True,
+        default=''
+    )
     preview_url = serializers.SerializerMethodField()
 
     class Meta:
@@ -15,13 +20,18 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'name',
+            'slug',
             'status',
             'template_name',
+            'template_category',
+            'customisation_data',
             'preview_url',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'slug', 'status', 'created_at', 'updated_at']
 
     def get_preview_url(self, obj):
-        return f"https://{obj.slug}.devlaunch.app" if obj.slug else None
+        if obj.slug:
+            return f"https://{obj.slug}.devlaunch.app"
+        return None

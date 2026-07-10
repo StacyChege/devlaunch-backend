@@ -2,6 +2,9 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils.text import slugify
 
+
+
+
 class UserManager(BaseUserManager):
     def create_user(self, email, full_name, password=None):
         if not email:

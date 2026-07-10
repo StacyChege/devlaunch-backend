@@ -36,6 +36,7 @@ class Project(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    customisation_data = models.JSONField(default=dict, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.slug:
