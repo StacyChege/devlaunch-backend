@@ -124,3 +124,78 @@ class AuthFlowTests(APITestCase):
             self.client.get('/api/auth/me/').status_code,
             status.HTTP_401_UNAUTHORIZED,
         )
+
+
+class AccountSettingsTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='dev@example.com', full_name='Old Name', password='Str0ngPass!23'
+        )
+        self.user.is_verified = True
+        self.user.save(update_fields=['is_verified'])
+        self.client.force_authenticate(self.user)
+
+    def test_patch_me_updates_full_name(self):
+        res = self.client.patch(
+            '/api/auth/me/', {'full_name': 'New Name'}, format='json'
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['full_name'], 'New Name')
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.full_name, 'New Name')
+
+    def test_patch_me_rejects_blank_name(self):
+        res = self.client.patch('/api/auth/me/', {'full_name': '  '}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_me_ignores_email_and_role(self):
+        res = self.client.patch(
+            '/api/auth/me/',
+            {'email': 'hacker@example.com', 'role': 'ADMIN', 'full_name': 'X'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'dev@example.com')
+        self.assertEqual(self.user.role, User.DEVELOPER)
+
+    def test_change_password_requires_correct_current(self):
+        res = self.client.post(
+            '/api/auth/change-password/',
+            {'current_password': 'wrong', 'new_password': 'An0therPass!45'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_change_password_success_and_relogin(self):
+        res = self.client.post(
+            '/api/auth/change-password/',
+            {'current_password': 'Str0ngPass!23', 'new_password': 'An0therPass!45'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.client.force_authenticate(None)
+        login = self.client.post(
+            '/api/auth/login/',
+            {'email': 'dev@example.com', 'password': 'An0therPass!45'},
+            format='json',
+        )
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+
+    def test_change_password_rejects_weak_new_password(self):
+        res = self.client.post(
+            '/api/auth/change-password/',
+            {'current_password': 'Str0ngPass!23', 'new_password': '123'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_change_password_requires_auth(self):
+        self.client.force_authenticate(None)
+        res = self.client.post(
+            '/api/auth/change-password/',
+            {'current_password': 'x', 'new_password': 'An0therPass!45'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)

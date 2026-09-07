@@ -38,6 +38,41 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'role', 'is_verified']
 
 
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """Self-service profile edits. Email and role are not changeable here."""
+
+    class Meta:
+        model = User
+        fields = ['full_name']
+
+    def validate_full_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Full name cannot be empty.')
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Current password is incorrect.')
+        return value
+
+    def validate_new_password(self, value):
+        validate_password(value, user=self.context['request'].user)
+        return value
+
+    def save(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save(update_fields=['password'])
+        return user
+
+
 class EmailSerializer(serializers.Serializer):
     """Shared by resend-verification and password-reset request."""
     email = serializers.EmailField()
