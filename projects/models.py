@@ -27,7 +27,8 @@ class Project(models.Model):
         related_name='projects'
     )
     name = models.CharField(max_length=255)
-    slug = models.SlugField(unique=True, blank=True, max_length=300)
+    # Kept <= 255 so MySQL can index it as unique (mysql.W003).
+    slug = models.SlugField(unique=True, blank=True, max_length=255)
     customisation_data = models.JSONField(default=dict, blank=True)
     status = models.CharField(
         max_length=20,
@@ -39,10 +40,19 @@ class Project(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            base = slugify(self.name)
+            base = slugify(self.name)[:200] or 'site'
             unique_id = uuid.uuid4().hex[:6]
             self.slug = f"{base}-{unique_id}"
         super().save(*args, **kwargs)
+
+    @property
+    def subdomain_url(self):
+        return f"https://{self.slug}.devlaunch.app" if self.slug else None
+
+    @property
+    def live_url(self):
+        """The public URL once deployed; None while the project is a draft."""
+        return self.subdomain_url if self.status == self.STATUS_DEPLOYED else None
 
     def __str__(self):
         return self.name

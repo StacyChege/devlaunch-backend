@@ -13,7 +13,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only=True,
         default=''
     )
-    preview_url = serializers.SerializerMethodField()
+    preview_url = serializers.ReadOnlyField(source='subdomain_url')
+    live_url = serializers.ReadOnlyField()
 
     class Meta:
         model = Project
@@ -26,12 +27,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             'template_category',
             'customisation_data',
             'preview_url',
+            'live_url',
             'created_at',
             'updated_at',
         ]
         read_only_fields = ['id', 'slug', 'status', 'created_at', 'updated_at']
-
-    def get_preview_url(self, obj):
-        if obj.slug:
-            return f"https://{obj.slug}.devlaunch.app"
-        return None
