@@ -6,12 +6,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
 from .serializers import RegisterSerializer, UserSerializer
 
-
-try:
-    from .models import Template
-except ImportError:
-    Template = None  # Handle the case where Template model is not defined
-
 User = get_user_model()
 
 

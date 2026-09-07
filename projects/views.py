@@ -1,15 +1,16 @@
+import os
+
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .models import Project
-from .serializers import ProjectSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 
-try:
-    from templates.models import Template
-except ImportError:
-    Template = None
+from .models import Project
+from .serializers import ProjectSerializer
+from templates.models import Template
 
 
 class ProjectStatsView(APIView):
