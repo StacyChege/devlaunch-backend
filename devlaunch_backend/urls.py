@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', ping, name='ping'),
     path('api/auth/', include('api.urls')),
+    path('api/admin/', include('api.admin_urls')),
     path('api/projects/', include('projects.urls')),
     path('api/templates/', include('templates.urls')),
 ]
