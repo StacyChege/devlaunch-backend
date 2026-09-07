@@ -1,6 +1,5 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
-from django.utils.text import slugify
 
 
 
@@ -19,6 +18,9 @@ class UserManager(BaseUserManager):
         user = self.create_user(email, full_name, password)
         user.is_staff = True
         user.is_superuser = True
+        user.role = self.model.ADMIN
+        # Skip the email-verification gate for CLI-created admins.
+        user.is_verified = True
         user.save(using=self._db)
         return user
 
