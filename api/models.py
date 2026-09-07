@@ -36,6 +36,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=DEVELOPER)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    is_verified = models.BooleanField(
+        default=False,
+        help_text='Set once the user confirms their email address.',
+    )
     date_joined = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()
