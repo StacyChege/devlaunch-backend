@@ -1,0 +1,5 @@
+# Keep LF in files that run inside Linux containers, regardless of host OS.
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

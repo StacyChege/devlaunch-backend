@@ -1,0 +1,74 @@
+name: Build & Deploy (backend)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: "Force full rebuild (no Docker layer cache)"
+        type: boolean
+        default: false
+
+env:
+  BACKEND_IMAGE: ghcr.io/stacychege/devlaunch-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          no-cache: ${{ github.event.inputs.no_cache == 'true' }}
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      # Fires AFTER the image is pushed so Dokploy always pulls the new digest.
+      - name: Trigger Dokploy deploy
+        continue-on-error: true
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: |
+          if [ -z "$DOKPLOY_API_KEY" ] || [ -z "$DOKPLOY_COMPOSE_ID" ] || [ -z "$DOKPLOY_URL" ]; then
+            echo "::warning::DOKPLOY_URL, DOKPLOY_API_KEY or DOKPLOY_COMPOSE_ID not set — deploy not triggered"
+            exit 0
+          fi
+          COMMIT_MSG=$(echo "${{ github.event.head_commit.message }}" | head -1)
+          COMMIT_SHA="${{ github.sha }}"
+          code=$(curl -skL -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -d "{\"composeId\": \"$DOKPLOY_COMPOSE_ID\", \"title\": \"backend: $COMMIT_MSG\", \"description\": \"$COMMIT_SHA\"}" \
+            -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$DOKPLOY_URL/api/compose.redeploy") || code="000"
+          echo "Redeploy response: HTTP $code"
+          if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+            echo "Deploy triggered successfully"
+          else
+            echo "::warning::Redeploy returned $code — check DOKPLOY_URL, DOKPLOY_API_KEY, DOKPLOY_COMPOSE_ID"
+          fi

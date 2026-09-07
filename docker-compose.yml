@@ -1,0 +1,54 @@
+# DevLaunch — Dokploy compose file.
+# Point the Dokploy Compose service at THIS repo / branch / ./docker-compose.yml.
+# Images are built and pushed by GitHub Actions in each repo; this file only
+# pulls and runs them. Set every ${VAR} below in the Dokploy Environment tab.
+#
+# Autodeploy must be OFF on this service — the GitHub Actions "Trigger Dokploy
+# deploy" step redeploys at the right time (after images are in GHCR).
+
+services:
+
+  backend:
+    image: ghcr.io/stacychege/devlaunch-backend:latest
+    pull_policy: always
+    container_name: devlaunch-backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+    extra_hosts:
+      # Lets the container reach a MySQL running on the host:
+      # set DB_HOST=host.docker.internal in the environment.
+      - "host.docker.internal:host-gateway"
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-3306}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      FRONTEND_URL: ${FRONTEND_URL}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
+      MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
+    # In Dokploy: this service's Domains tab -> add api.<your-domain>, port 8000.
+
+  frontend:
+    image: ghcr.io/stacychege/devlaunch-frontend:latest
+    pull_policy: always
+    container_name: devlaunch-frontend
+    restart: unless-stopped
+    expose:
+      - "80"   # Traefik owns host :80 — expose, never ports:
+    # In Dokploy: this service's Domains tab -> add <your-domain>, port 80.
+    # VITE_API_BASE_URL is baked into this image at build time (see the
+    # frontend repo's GitHub Actions), not set here.
