@@ -199,3 +199,11 @@ class AccountSettingsTests(APITestCase):
             format='json',
         )
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class HealthCheckTests(APITestCase):
+    def test_healthz_ok(self):
+        res = self.client.get('/healthz/')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()['status'], 'ok')
+        self.assertEqual(res.json()['database'], 'ok')

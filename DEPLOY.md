@@ -31,9 +31,12 @@ the Dokploy host).
   file `./docker-compose.yml`
 - **General tab → Autodeploy OFF** (critical — the workflow handles timing)
 - **Environment tab →** set every `${VAR}` from `docker-compose.yml`
-  (`SECRET_KEY`, `ALLOWED_HOSTS`, `DB_*`, `CORS_ALLOWED_ORIGINS`,
+  (`SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `DB_*`,
+  `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS` (= `https://api.<your-domain>`),
   `FRONTEND_URL`, `EMAIL_*`, `DEFAULT_FROM_EMAIL`, `STRIPE_SECRET_KEY`,
   `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`)
+- With `DEBUG=False` the backend forces HTTPS redirect, secure cookies
+  and HSTS — make sure the domain has TLS before flipping it.
 - **backend service → Domains →** `api.<your-domain>` → port `8000`
 - **frontend service → Domains →** `<your-domain>` → port `80`
 
@@ -55,7 +58,9 @@ use its host. The container runs `migrate` on every start.
 ### 5. First deploy
 Push to `main` (or run the workflow manually) → watch Actions (~3–6 min) →
 Dokploy log should show `Container devlaunch-backend Recreate`, not just
-`Running`. Then create the admin user from the Dokploy service terminal:
+`Running`. Both containers have healthchecks — wait for `healthy`.
+`GET https://api.<your-domain>/healthz/` should return `{"status":"ok"}`.
+Then create the admin user from the Dokploy service terminal:
 
 ```
 python manage.py createsuperuser

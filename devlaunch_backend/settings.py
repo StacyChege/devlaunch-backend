@@ -193,3 +193,47 @@ DEFAULT_FROM_EMAIL = config(
 
 # Password reset links expire after 30 minutes (PRD 2.1).
 PASSWORD_RESET_TIMEOUT = 60 * 30
+
+
+# --- Security -------------------------------------------------------------
+# Traefik terminates TLS and forwards this header, so Django knows the
+# original request was HTTPS (needed for secure cookies + SSL redirect).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Django admin login posts a form, so its origin must be trusted for CSRF
+# once served over HTTPS on the api subdomain. e.g. https://api.example.com
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+
+# Hardening that only makes sense with real TLS in front. Off by default so
+# dev and the test runner are unaffected; set SECURE_HTTPS=True in production
+# once the domain has a certificate.
+SECURE_HTTPS = config('SECURE_HTTPS', default=False, cast=bool)
+if SECURE_HTTPS:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 days
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+
+# --- Logging -----------------------------------------------------------
+# Send everything to stdout so Docker / Dokploy captures it.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '{levelname} {asctime} {name} {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'},
+    },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'django.request': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+    },
+}

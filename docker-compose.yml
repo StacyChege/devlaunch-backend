@@ -22,6 +22,7 @@ services:
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG:-False}
+      SECURE_HTTPS: ${SECURE_HTTPS:-True}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
@@ -37,9 +38,16 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY}
       MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz/').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     # In Dokploy: this service's Domains tab -> add api.<your-domain>, port 8000.
 
   frontend:
@@ -49,6 +57,12 @@ services:
     restart: unless-stopped
     expose:
       - "80"   # Traefik owns host :80 — expose, never ports:
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     # In Dokploy: this service's Domains tab -> add <your-domain>, port 80.
     # VITE_API_BASE_URL is baked into this image at build time (see the
     # frontend repo's GitHub Actions), not set here.

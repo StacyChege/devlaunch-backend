@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.db import connection
 from django.http import JsonResponse
 from django.conf.urls.static import static
 from devlaunch_backend import settings
@@ -23,9 +24,19 @@ from devlaunch_backend import settings
 def ping(request):
     return JsonResponse({"message": "pong", "status": "Backend is alive"})
 
+def healthz(request):
+    """Liveness + DB check for the container healthcheck."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        return JsonResponse({'status': 'ok', 'database': 'ok'})
+    except Exception:
+        return JsonResponse({'status': 'error', 'database': 'unreachable'}, status=503)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', ping, name='ping'),
+    path('healthz/', healthz, name='healthz'),
     path('api/auth/', include('api.urls')),
     path('api/admin/', include('api.admin_urls')),
     path('api/projects/', include('projects.urls')),
