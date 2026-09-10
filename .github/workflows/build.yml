@@ -14,7 +14,46 @@ env:
   BACKEND_IMAGE: ghcr.io/stacychege/devlaunch-backend
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: devlaunch_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      SECRET_KEY: ci-secret
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      DB_NAME: devlaunch_ci
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+      STRIPE_SECRET_KEY: ci
+      MPESA_CONSUMER_KEY: ci
+      MPESA_CONSUMER_SECRET: ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends default-libmysqlclient-dev pkg-config build-essential
+      - run: pip install -r requirements.txt
+      - run: python manage.py test --verbosity=2
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
