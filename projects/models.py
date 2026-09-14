@@ -47,12 +47,46 @@ class Project(models.Model):
 
     @property
     def subdomain_url(self):
+        """The intended production URL. Only really resolves once wildcard
+        DNS for *.devlaunch.app points at the server — see DEPLOY.md."""
         return f"https://{self.slug}.devlaunch.app" if self.slug else None
 
     @property
-    def live_url(self):
-        """The public URL once deployed; None while the project is a draft."""
-        return self.subdomain_url if self.status == self.STATUS_DEPLOYED else None
+    def site_path(self):
+        """Relative path that serves the live site today, regardless of
+        DNS: the backend resolves it by slug (see projects.views.SiteView)."""
+        return f"/sites/{self.slug}/" if self.slug else None
 
     def __str__(self):
         return self.name
+
+
+class Deployment(models.Model):
+    STATUS_QUEUED = 'QUEUED'
+    STATUS_BUILDING = 'BUILDING'
+    STATUS_SUCCESS = 'SUCCESS'
+    STATUS_FAILED = 'FAILED'
+    STATUS_CHOICES = [
+        (STATUS_QUEUED, 'Queued'),
+        (STATUS_BUILDING, 'Building'),
+        (STATUS_SUCCESS, 'Success'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name='deployments'
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_QUEUED
+    )
+    # Rendered output for a SUCCESS deployment — what /sites/<slug>/ serves.
+    html = models.TextField(blank=True)
+    build_log = models.TextField(blank=True)
+    is_rollback = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.project.name} — {self.status} ({self.created_at:%Y-%m-%d %H:%M})"

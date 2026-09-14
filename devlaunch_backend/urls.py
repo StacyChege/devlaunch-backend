@@ -20,6 +20,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.conf.urls.static import static
 from devlaunch_backend import settings
+from projects.views import SiteView
 
 def ping(request):
     return JsonResponse({"message": "pong", "status": "Backend is alive"})
@@ -37,6 +38,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', ping, name='ping'),
     path('healthz/', healthz, name='healthz'),
+    # The actual live site for a deployed project — see projects.views.SiteView.
+    path('sites/<slug:slug>/', SiteView.as_view(), name='site'),
     path('api/auth/', include('api.urls')),
     path('api/admin/', include('api.admin_urls')),
     path('api/projects/', include('projects.urls')),

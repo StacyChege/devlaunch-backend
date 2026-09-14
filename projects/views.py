@@ -2,15 +2,18 @@ import os
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
-from .models import Project
-from .serializers import ProjectSerializer
 from templates.models import Template
+
+from .deployment import run_deploy, run_rollback
+from .models import Deployment, Project
+from .serializers import DeploymentSerializer, ProjectSerializer
 
 
 class ProjectStatsView(APIView):
@@ -44,7 +47,9 @@ class ProjectListCreateView(APIView):
         projects = Project.objects.filter(
             developer=request.user
         ).order_by('-updated_at')
-        serializer = ProjectSerializer(projects, many=True)
+        serializer = ProjectSerializer(
+            projects, many=True, context={'request': request}
+        )
         return Response(serializer.data)
 
     def post(self, request):
@@ -70,7 +75,7 @@ class ProjectListCreateView(APIView):
             name=f"My {template.name}",
         )
 
-        serializer = ProjectSerializer(project)
+        serializer = ProjectSerializer(project, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -90,7 +95,7 @@ class ProjectDetailView(APIView):
                 {'error': 'Project not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        serializer = ProjectSerializer(project)
+        serializer = ProjectSerializer(project, context={'request': request})
         return Response(serializer.data)
 
     def patch(self, request, pk):
@@ -103,7 +108,8 @@ class ProjectDetailView(APIView):
         serializer = ProjectSerializer(
             project,
             data=request.data,
-            partial=True
+            partial=True,
+            context={'request': request},
         )
         if serializer.is_valid():
             serializer.save()
@@ -171,3 +177,94 @@ class ProjectLogoUploadView(APIView):
         project.save()
 
         return Response({'logo_url': logo_url})
+
+
+class ProjectDeployView(APIView):
+    """POST triggers a build. Also how redeploy works — every call renders
+    the project's current customisation_data as a fresh Deployment."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            project = Project.objects.get(id=pk, developer=request.user)
+        except Project.DoesNotExist:
+            return Response(
+                {'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        deployment = run_deploy(project)
+        serializer = DeploymentSerializer(deployment)
+        http_status = (
+            status.HTTP_201_CREATED
+            if deployment.status == Deployment.STATUS_SUCCESS
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        return Response(
+            {
+                'deployment': serializer.data,
+                'project': ProjectSerializer(project, context={'request': request}).data,
+            },
+            status=http_status,
+        )
+
+
+class ProjectRollbackView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            project = Project.objects.get(id=pk, developer=request.user)
+        except Project.DoesNotExist:
+            return Response(
+                {'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            deployment = run_rollback(project)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = DeploymentSerializer(deployment)
+        return Response({
+            'deployment': serializer.data,
+            'project': ProjectSerializer(project, context={'request': request}).data,
+        })
+
+
+class ProjectDeploymentListView(APIView):
+    """Deployment history for the project's dashboard (PRD F3 rollback UI)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            project = Project.objects.get(id=pk, developer=request.user)
+        except Project.DoesNotExist:
+            return Response(
+                {'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND
+            )
+        deployments = project.deployments.all()  # Meta.ordering = -created_at
+        return Response(DeploymentSerializer(deployments, many=True).data)
+
+
+class SiteView(APIView):
+    """Serves a deployed project's rendered site. Public — this *is* the
+    live website. Reached today via /sites/<slug>/; once wildcard DNS for
+    *.devlaunch.app points here, the same content will answer on the
+    subdomain too (see DEPLOY.md)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        try:
+            project = Project.objects.get(slug=slug)
+        except Project.DoesNotExist:
+            return HttpResponse('Site not found.', status=404, content_type='text/plain')
+
+        deployment = project.deployments.filter(status=Deployment.STATUS_SUCCESS).first()
+        if not deployment:
+            return HttpResponse(
+                'This project has not been deployed yet.',
+                status=404,
+                content_type='text/plain',
+            )
+
+        return HttpResponse(deployment.html, content_type='text/html')
