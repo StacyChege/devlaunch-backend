@@ -1,7 +1,7 @@
 """Platform admin endpoints (PRD F6). All require the ADMIN role.
 
-Scope for this round: developer oversight + template library management.
-Deployment and billing views land with those features.
+Developer oversight, template library management, and (now that F3
+exists) a read-only view across all deployments. Billing lands with F5.
 """
 from django.contrib.auth import get_user_model
 from django.db.models import Count, Q
@@ -9,10 +9,11 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from projects.models import Project
+from projects.models import Deployment, Project
 from templates.models import Template
 
 from .admin_serializers import (
+    AdminDeploymentSerializer,
     AdminSetActiveSerializer,
     AdminTemplateSerializer,
     AdminUserSerializer,
@@ -43,6 +44,10 @@ class AdminOverviewView(AdminBase):
             'deployed_projects': projects.filter(status=_DEPLOYED).count(),
             'total_templates': templates.count(),
             'active_templates': templates.filter(is_active=True).count(),
+            'total_deployments': Deployment.objects.count(),
+            'failed_deployments': Deployment.objects.filter(
+                status=Deployment.STATUS_FAILED
+            ).count(),
         })
 
 
@@ -152,3 +157,18 @@ class AdminTemplateDetailView(AdminBase):
             return Response({'error': 'Template not found'}, status=status.HTTP_404_NOT_FOUND)
         template.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminDeploymentListView(AdminBase):
+    """Every deployment across every developer (PRD F6)."""
+
+    def get(self, request):
+        qs = Deployment.objects.select_related(
+            'project', 'project__developer'
+        ).all()  # Deployment.Meta.ordering = -created_at
+
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter.upper())
+
+        return Response(AdminDeploymentSerializer(qs, many=True).data)

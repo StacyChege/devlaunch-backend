@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from projects.models import Deployment
 from templates.models import Template
 
 User = get_user_model()
@@ -55,3 +56,22 @@ class AdminTemplateSerializer(serializers.ModelSerializer):
             'project_count',
         ]
         read_only_fields = ['id', 'slug', 'created_at', 'category_display', 'project_count']
+
+
+class AdminDeploymentSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    project_slug = serializers.CharField(source='project.slug', read_only=True)
+    developer_email = serializers.CharField(source='project.developer.email', read_only=True)
+
+    class Meta:
+        model = Deployment
+        fields = [
+            'id',
+            'project_name',
+            'project_slug',
+            'developer_email',
+            'status',
+            'is_rollback',
+            'created_at',
+        ]
+        read_only_fields = fields
