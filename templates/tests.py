@@ -117,3 +117,11 @@ class TemplatePreviewTests(APITestCase):
     def test_preview_404_for_unknown_slug(self):
         res = self.client.get('/api/templates/does-not-exist/preview/')
         self.assertEqual(res.status_code, 404)
+
+    def test_curated_external_preview_url_is_used_when_no_local_source(self):
+        self.placeholder.preview_url = 'https://example.com/agency-demo'
+        self.placeholder.save(update_fields=['preview_url'])
+
+        res = self.client.get('/api/templates/')
+        by_name = {t['name']: t for t in res.data}
+        self.assertEqual(by_name['Agency One']['preview_url'], 'https://example.com/agency-demo')

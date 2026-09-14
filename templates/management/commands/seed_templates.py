@@ -123,9 +123,11 @@ class Command(BaseCommand):
             slug = slugify(entry['name'])
             _, was_created = Template.objects.update_or_create(
                 slug=slug,
-                # preview_url is always derived from source now (see
-                # TemplateSerializer.get_preview_url) — clear any stale
-                # stored value from before that changed.
+                # Curated templates render their own preview from source
+                # (see TemplateSerializer.get_preview_url) — clear the old
+                # fabricated demo.devlaunch.app URLs this seed used to set.
+                # Admins can still set a real external preview_url later
+                # for a template that isn't sourced here yet.
                 defaults={**entry, 'is_active': True, 'preview_url': ''},
             )
             created += was_created

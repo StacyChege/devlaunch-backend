@@ -41,11 +41,12 @@ class TemplateSerializer(serializers.ModelSerializer):
         return has_real_source(obj)
 
     def get_preview_url(self, obj):
-        """Self-rendered demo when we have real source; None otherwise —
-        never a stored URL, since there's nothing external actually hosting
-        curated demos yet."""
+        """Self-rendered demo when we have real source (always current,
+        never stale). Falls back to an admin-curated external URL if one
+        was set — e.g. for a template hosted elsewhere before its source
+        lands here. Otherwise there's honestly nothing to preview yet."""
         request = self.context.get('request')
-        if not has_real_source(obj):
-            return None
-        path = f'/api/templates/{obj.slug}/preview/'
-        return request.build_absolute_uri(path) if request else path
+        if has_real_source(obj):
+            path = f'/api/templates/{obj.slug}/preview/'
+            return request.build_absolute_uri(path) if request else path
+        return obj.preview_url or None
