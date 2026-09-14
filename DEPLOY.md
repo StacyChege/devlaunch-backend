@@ -67,4 +67,22 @@ python manage.py createsuperuser
 python manage.py seed_templates
 ```
 
+### 6. (Optional) real project subdomains — `<slug>.devlaunch.app`
+A deployed project already works today at `https://api.<your-domain>/sites/<slug>/`
+(no DNS needed — see `projects.views.SiteView`). To make the PRD-shaped
+`<slug>.devlaunch.app` URL resolve to the same content:
+
+1. At your DNS provider, add a wildcard record: `*.devlaunch.app` → your
+   server (A record to the IP, or CNAME if fronted by a CDN).
+2. In Dokploy, add `*.devlaunch.app` as a domain on the **backend** service
+   (Traefik needs a wildcard TLS cert — Dokploy can issue one via Let's
+   Encrypt DNS-01 if your DNS provider is supported, otherwise upload one).
+3. Add a tiny host-based route in front of `SiteView` that maps the
+   subdomain to a slug (Traefik can rewrite `Host` to a path prefix, or add
+   a Django middleware that reads `request.get_host()`). Not built yet —
+   the path route is the real one for now.
+
+Until that's done, `Project.subdomain_url` is display-only; `live_url` (the
+`/sites/` path) is what actually works and is what the UI links to.
+
 See `DEPLOY_TEMPLATE.md` for the full reference and Traefik gotchas.
