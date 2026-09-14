@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ meta_title }}</title>
+<meta name="description" content="{{ meta_description }}" />
+<style>
+  :root {
+    --primary: {{ primary_colour }};
+    --secondary: {{ secondary_colour }};
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #1f2430;
+    background: #fff;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0; border-bottom: 1px solid #eceef2;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .brand img { height: 32px; width: 32px; border-radius: 6px; object-fit: cover; }
+  .brand-badge {
+    height: 32px; width: 32px; border-radius: 6px;
+    background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+  }
+  nav .cta {
+    background: var(--primary); color: #fff; padding: 10px 18px;
+    border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;
+  }
+
+  .hero { padding: 88px 0 72px; text-align: center; }
+  .hero h1 {
+    font-size: clamp(30px, 5vw, 48px); margin: 0 0 18px; letter-spacing: -0.02em;
+  }
+  .hero p {
+    font-size: 18px; color: #5b6472; max-width: 52ch; margin: 0 auto 32px;
+  }
+  .hero .cta {
+    display: inline-block; background: var(--primary); color: #fff;
+    padding: 14px 28px; border-radius: 8px; font-weight: 600; text-decoration: none;
+  }
+
+  .services {
+    background: var(--secondary); color: #fff; padding: 64px 0;
+  }
+  .services h2 {
+    text-align: center; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 0.08em; opacity: 0.75; margin: 0 0 32px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+  .grid .item h3 { margin: 0 0 8px; font-size: 17px; }
+  .grid .item p { margin: 0; opacity: 0.78; font-size: 14.5px; }
+
+  .testimonial { padding: 72px 0; text-align: center; }
+  .testimonial blockquote {
+    font-size: 22px; font-style: italic; max-width: 52ch; margin: 0 auto 16px; color: #2c3240;
+  }
+  .testimonial cite { color: #8a92a0; font-size: 14px; }
+
+  footer {
+    border-top: 1px solid #eceef2; padding: 32px 0; color: #8a92a0;
+    font-size: 13.5px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <div class="wrap">
+    <nav>
+      <div class="brand">
+        {% if logo_url %}
+          <img src="{{ logo_url }}" alt="{{ site_name }} logo" />
+        {% else %}
+          <span class="brand-badge">{{ site_name|slice:":1" }}</span>
+        {% endif %}
+        {{ site_name }}
+      </div>
+      <a class="cta" href="#contact">Get in touch</a>
+    </nav>
+  </div>
+
+  <section class="hero">
+    <div class="wrap">
+      <h1>{{ site_name }}</h1>
+      <p>{{ tagline|default:"An affordable launchpad for your business, live today." }}</p>
+      <a class="cta" href="#contact">Get Started</a>
+    </div>
+  </section>
+
+  <section class="services">
+    <div class="wrap">
+      <h2>What We Offer</h2>
+      <div class="grid">
+        <div class="item">
+          <h3>Service One</h3>
+          <p>Describe the first thing you offer and who it's for.</p>
+        </div>
+        <div class="item">
+          <h3>Service Two</h3>
+          <p>A second offering — keep it to one or two lines.</p>
+        </div>
+        <div class="item">
+          <h3>Service Three</h3>
+          <p>Round it out with a third, focused on outcomes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="testimonial">
+    <div class="wrap">
+      <blockquote>"Working with {{ site_name }} made all the difference."</blockquote>
+      <cite>— A happy customer</cite>
+    </div>
+  </section>
+
+  <footer id="contact">
+    <div class="wrap">
+      © {{ site_name }} · built with DevLaunch
+    </div>
+  </footer>
+
+</body>
+</html>

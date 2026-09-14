@@ -74,3 +74,46 @@ class TemplateGalleryTests(APITestCase):
     def test_detail_404_for_inactive(self):
         res = self.client.get('/api/templates/hidden-draft/')
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class TemplatePreviewTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.real = Template.objects.create(
+            name='Solo Portfolio', category=Template.PORTFOLIO,
+            description='A clean portfolio.', source_path='solo-portfolio',
+        )
+        cls.placeholder = Template.objects.create(
+            name='Agency One', category=Template.AGENCY,
+            description='Coming soon.', source_path='',
+        )
+
+    def test_gallery_marks_deployable_templates(self):
+        res = self.client.get('/api/templates/')
+        by_name = {t['name']: t for t in res.data}
+        self.assertTrue(by_name['Solo Portfolio']['is_deployable'])
+        self.assertFalse(by_name['Agency One']['is_deployable'])
+
+    def test_preview_url_only_set_for_deployable_templates(self):
+        res = self.client.get('/api/templates/')
+        by_name = {t['name']: t for t in res.data}
+        self.assertTrue(
+            by_name['Solo Portfolio']['preview_url'].endswith(
+                '/api/templates/solo-portfolio/preview/'
+            )
+        )
+        self.assertIsNone(by_name['Agency One']['preview_url'])
+
+    def test_preview_renders_real_html(self):
+        res = self.client.get('/api/templates/solo-portfolio/preview/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res['Content-Type'], 'text/html')
+        self.assertIn(b'Solo Portfolio', res.content)
+
+    def test_preview_404_when_no_source(self):
+        res = self.client.get('/api/templates/agency-one/preview/')
+        self.assertEqual(res.status_code, 404)
+
+    def test_preview_404_for_unknown_slug(self):
+        res = self.client.get('/api/templates/does-not-exist/preview/')
+        self.assertEqual(res.status_code, 404)

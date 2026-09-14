@@ -1,14 +1,22 @@
 from django.db.models import Q
+from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
 
 from .models import Template
+from .rendering import has_real_source, render_site
 from .serializers import TemplateSerializer
 
 TRUE_VALUES = {'1', 'true', 'yes', 'premium'}
 FALSE_VALUES = {'0', 'false', 'no', 'free'}
+
+# Placeholder customisation shown in the gallery preview — a template's own
+# name/description stand in for a real project's until someone deploys one.
+DEMO_CUSTOMISATION = {
+    'tagline': 'A clean, professional site — ready to launch in minutes.',
+}
 
 
 class TemplateListView(APIView):
@@ -62,3 +70,29 @@ class TemplateDetailView(APIView):
             )
         serializer = TemplateSerializer(template, context={'request': request})
         return Response(serializer.data)
+
+
+class TemplatePreviewView(APIView):
+    """Renders the template's real source with demo content. This is what
+    the gallery's preview_url / iframe points at — not an external demo
+    host, the same renderer F3 uses to build a deployed project."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        try:
+            template = Template.objects.get(slug=slug, is_active=True)
+        except Template.DoesNotExist:
+            return HttpResponse('Template not found.', status=404, content_type='text/plain')
+
+        if not has_real_source(template):
+            return HttpResponse(
+                'No preview available for this template yet.',
+                status=404,
+                content_type='text/plain',
+            )
+
+        html = render_site(template, template.name, {
+            **DEMO_CUSTOMISATION,
+            'meta_description': template.description,
+        })
+        return HttpResponse(html, content_type='text/html')
