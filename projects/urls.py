@@ -3,6 +3,9 @@ from .views import (
     ProjectDeployView,
     ProjectDeploymentListView,
     ProjectDetailView,
+    ProjectDomainDetailView,
+    ProjectDomainListCreateView,
+    ProjectDomainVerifyView,
     ProjectListCreateView,
     ProjectLogoUploadView,
     ProjectRollbackView,
@@ -17,4 +20,7 @@ urlpatterns = [
     path('<int:pk>/deploy/', ProjectDeployView.as_view(), name='project_deploy'),
     path('<int:pk>/rollback/', ProjectRollbackView.as_view(), name='project_rollback'),
     path('<int:pk>/deployments/', ProjectDeploymentListView.as_view(), name='project_deployments'),
+    path('<int:pk>/domains/', ProjectDomainListCreateView.as_view(), name='project_domains'),
+    path('<int:pk>/domains/<int:domain_id>/', ProjectDomainDetailView.as_view(), name='project_domain_detail'),
+    path('<int:pk>/domains/<int:domain_id>/verify/', ProjectDomainVerifyView.as_view(), name='project_domain_verify'),
 ]

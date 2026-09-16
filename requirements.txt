@@ -8,6 +8,7 @@ mysqlclient==2.2.8
 pillow==12.2.0
 requests==2.34.2
 stripe==15.2.1
+dnspython==2.8.0
 
 # Production serving
 gunicorn==23.0.0

@@ -1,9 +1,11 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from templates.models import Template
-from .models import Project
+from .models import Domain, Project
 
 User = get_user_model()
 
@@ -281,3 +283,131 @@ class SiteViewTests(APITestCase):
 
         res = self.client.get(f'/sites/{self.project.slug}/')
         self.assertEqual(res.status_code, 200)
+
+
+class DomainTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='dev@example.com', full_name='Dev', password='Str0ngPass!23'
+        )
+        self.other = User.objects.create_user(
+            email='other@example.com', full_name='Other', password='Str0ngPass!23'
+        )
+        self.template = Template.objects.create(
+            name='Solo Portfolio', category=Template.PORTFOLIO, description='x',
+        )
+        self.project = Project.objects.create(
+            developer=self.user, template=self.template, name='My Site'
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_add_domain_normalises_and_returns_dns_instructions(self):
+        res = self.client.post(
+            f'/api/projects/{self.project.id}/domains/',
+            {'domain_name': 'HTTPS://WWW.Example.com/foo'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data['domain_name'], 'www.example.com')
+        self.assertEqual(res.data['status'], 'PENDING')
+        self.assertEqual(res.data['record_type'], 'CNAME')
+        self.assertEqual(res.data['record_value'], 'devlaunch.app')
+
+    def test_add_domain_rejects_invalid_format(self):
+        res = self.client.post(
+            f'/api/projects/{self.project.id}/domains/',
+            {'domain_name': 'not a domain'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_add_domain_rejects_devlaunch_app(self):
+        res = self.client.post(
+            f'/api/projects/{self.project.id}/domains/',
+            {'domain_name': 'sneaky.devlaunch.app'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_add_domain_rejects_duplicate(self):
+        Domain.objects.create(project=self.project, domain_name='www.example.com')
+        res = self.client.post(
+            f'/api/projects/{self.project.id}/domains/',
+            {'domain_name': 'www.example.com'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_domains_scoped_to_project(self):
+        Domain.objects.create(project=self.project, domain_name='a.example.com')
+        other_project = Project.objects.create(
+            developer=self.user, template=self.template, name='Other'
+        )
+        Domain.objects.create(project=other_project, domain_name='b.example.com')
+
+        res = self.client.get(f'/api/projects/{self.project.id}/domains/')
+        self.assertEqual([d['domain_name'] for d in res.data], ['a.example.com'])
+
+    def test_domain_endpoints_require_ownership(self):
+        theirs = Project.objects.create(
+            developer=self.other, template=self.template, name='Theirs'
+        )
+        self.assertEqual(
+            self.client.get(f'/api/projects/{theirs.id}/domains/').status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(
+            self.client.post(
+                f'/api/projects/{theirs.id}/domains/',
+                {'domain_name': 'a.example.com'}, format='json',
+            ).status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_delete_domain(self):
+        domain = Domain.objects.create(project=self.project, domain_name='a.example.com')
+        res = self.client.delete(f'/api/projects/{self.project.id}/domains/{domain.id}/')
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Domain.objects.filter(pk=domain.id).exists())
+
+    def test_delete_unknown_domain_404(self):
+        res = self.client.delete(f'/api/projects/{self.project.id}/domains/9999/')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch('projects.views.check_domain')
+    def test_verify_marks_domain_verified(self, mock_check):
+        mock_check.return_value = (True, 'CNAME verified.')
+        domain = Domain.objects.create(project=self.project, domain_name='a.example.com')
+
+        res = self.client.post(
+            f'/api/projects/{self.project.id}/domains/{domain.id}/verify/'
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['status'], 'VERIFIED')
+        self.assertIsNotNone(res.data['verified_at'])
+        domain.refresh_from_db()
+        self.assertEqual(domain.status, Domain.STATUS_VERIFIED)
+
+    @patch('projects.views.check_domain')
+    def test_verify_marks_domain_failed_with_message(self, mock_check):
+        mock_check.return_value = (False, 'CNAME points to "elsewhere.com", expected "devlaunch.app".')
+        domain = Domain.objects.create(project=self.project, domain_name='a.example.com')
+
+        res = self.client.post(
+            f'/api/projects/{self.project.id}/domains/{domain.id}/verify/'
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['status'], 'FAILED')
+        self.assertIn('elsewhere.com', res.data['last_check_message'])
+        self.assertIsNone(res.data['verified_at'])
+
+    @patch('projects.views.check_domain')
+    def test_project_surfaces_verified_domain(self, mock_check):
+        mock_check.return_value = (True, 'CNAME verified.')
+        domain = Domain.objects.create(project=self.project, domain_name='a.example.com')
+        self.client.post(f'/api/projects/{self.project.id}/domains/{domain.id}/verify/')
+
+        res = self.client.get(f'/api/projects/{self.project.id}/')
+        self.assertEqual(res.data['verified_domain'], 'a.example.com')

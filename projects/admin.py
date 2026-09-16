@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Deployment, Project
+from .models import Deployment, Domain, Project
 
 
 @admin.register(Project)
@@ -23,3 +23,14 @@ class DeploymentAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         # Deployments only ever come from the pipeline, never typed by hand.
         return False
+
+
+@admin.register(Domain)
+class DomainAdmin(admin.ModelAdmin):
+    list_display = ('domain_name', 'project', 'status', 'verified_at')
+    list_filter = ('status',)
+    search_fields = ('domain_name', 'project__name')
+    readonly_fields = (
+        'created_at', 'verified_at', 'last_checked_at', 'last_check_message'
+    )
+    raw_id_fields = ('project',)

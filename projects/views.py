@@ -9,11 +9,26 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from django.utils import timezone
+
 from templates.models import Template
 
 from .deployment import run_deploy, run_rollback
-from .models import Deployment, Project
-from .serializers import DeploymentSerializer, ProjectSerializer
+from .dns_check import check_domain
+from .models import Deployment, Domain, Project
+from .serializers import (
+    AddDomainSerializer,
+    DeploymentSerializer,
+    DomainSerializer,
+    ProjectSerializer,
+)
+
+
+def _get_owned_project(pk, user):
+    try:
+        return Project.objects.get(id=pk, developer=user)
+    except Project.DoesNotExist:
+        return None
 
 
 class ProjectStatsView(APIView):
@@ -244,6 +259,76 @@ class ProjectDeploymentListView(APIView):
             )
         deployments = project.deployments.all()  # Meta.ordering = -created_at
         return Response(DeploymentSerializer(deployments, many=True).data)
+
+
+class ProjectDomainListCreateView(APIView):
+    """Custom domains for a project (PRD F4). A project can have more than
+    one Domain row (e.g. a failed attempt left around for reference); the
+    live custom-domain, if any, is the one with status VERIFIED."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        project = _get_owned_project(pk, request.user)
+        if not project:
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(DomainSerializer(project.domains.all(), many=True).data)
+
+    def post(self, request, pk):
+        project = _get_owned_project(pk, request.user)
+        if not project:
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AddDomainSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        domain = Domain.objects.create(
+            project=project,
+            domain_name=serializer.validated_data['domain_name'],
+        )
+        return Response(DomainSerializer(domain).data, status=status.HTTP_201_CREATED)
+
+
+class ProjectDomainDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk, domain_id):
+        project = _get_owned_project(pk, request.user)
+        if not project:
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        deleted, _ = project.domains.filter(id=domain_id).delete()
+        if not deleted:
+            return Response({'error': 'Domain not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProjectDomainVerifyView(APIView):
+    """Runs a real DNS lookup against the domain's CNAME record. Triggered
+    by the developer (no background poller yet — see DEPLOY.md)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk, domain_id):
+        project = _get_owned_project(pk, request.user)
+        if not project:
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            domain = project.domains.get(id=domain_id)
+        except Domain.DoesNotExist:
+            return Response({'error': 'Domain not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        is_verified, message = check_domain(domain.domain_name)
+
+        domain.status = Domain.STATUS_VERIFIED if is_verified else Domain.STATUS_FAILED
+        domain.last_check_message = message
+        domain.last_checked_at = timezone.now()
+        if is_verified and not domain.verified_at:
+            domain.verified_at = timezone.now()
+        domain.save(update_fields=[
+            'status', 'last_check_message', 'last_checked_at', 'verified_at'
+        ])
+
+        return Response(DomainSerializer(domain).data)
 
 
 class SiteView(APIView):

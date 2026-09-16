@@ -90,3 +90,41 @@ class Deployment(models.Model):
 
     def __str__(self):
         return f"{self.project.name} — {self.status} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+# What every custom domain must CNAME to. Verification checks the domain's
+# CNAME chain resolves here; it's also the target shown in DNS instructions.
+DNS_CNAME_TARGET = 'devlaunch.app'
+
+
+class Domain(models.Model):
+    STATUS_PENDING = 'PENDING'
+    STATUS_VERIFIED = 'VERIFIED'
+    STATUS_FAILED = 'FAILED'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_VERIFIED, 'Verified'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name='domains'
+    )
+    domain_name = models.CharField(max_length=255, unique=True)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING
+    )
+    # What we told the developer to add at their registrar, and the last
+    # reason a check didn't pass — shown as-is in the domain settings UI.
+    record_type = models.CharField(max_length=10, default='CNAME')
+    record_value = models.CharField(max_length=255, default=DNS_CNAME_TARGET)
+    last_check_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.domain_name} ({self.status})"
